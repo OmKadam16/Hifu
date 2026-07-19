@@ -20,27 +20,41 @@ export default function ScanSkin() {
   };
 
   const scan = async (f: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setScanPhoto(dataUrl);
+      doScan(f, dataUrl);
+    };
+    reader.onerror = () => { alert('Failed to read image'); };
+    reader.readAsDataURL(f);
+  };
+
+  const handleCapture = async (f: File) => {
+    setCameraOpen(false);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setScanPhoto(dataUrl);
+      doScan(f, dataUrl);
+    };
+    reader.readAsDataURL(f);
+  };
+
+  async function doScan(f: File, dataUrl: string) {
     setLoading(true);
-    const photoUrl = URL.createObjectURL(f);
-    setScanPhoto(photoUrl);
     try {
       const existingId = getFaceId() || undefined;
       const { data } = await assessSkin(f, goal, existingId);
       setProfile(data);
       navigate('/profile');
     } catch (e: any) {
-      URL.revokeObjectURL(photoUrl);
       setScanPhoto(null);
       alert(e.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCapture = async (f: File) => {
-    setCameraOpen(false);
-    await scan(f);
-  };
+  }
 
   return (
     <>

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Shield, AlertTriangle, CheckCircle,
-  Clock, Target, Activity, BarChart3, Sparkles,
+  Clock, Target, Activity, BarChart3, Sparkles, Loader2, FileText,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useAppState } from '../AppContext';
@@ -54,21 +54,22 @@ export default function Reports() {
   const { profile, scans, history } = useAppState();
   const faceId = getFaceId();
   const [report, setReport] = useState<ReportData | null>(null);
-  const [reportLoading, setReportLoading] = useState(true);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
 
-  useEffect(() => {
-    if (!faceId) { setReportLoading(false); return; }
-    (async () => {
-      try {
-        const data = await generateReport(faceId);
-        setReport(data);
-      } catch {
-        setReport(null);
-      } finally {
-        setReportLoading(false);
-      }
-    })();
-  }, [faceId]);
+  async function handleGenerate() {
+    setReport(null);
+    setReportError('');
+    setReportLoading(true);
+    try {
+      const data = await generateReport(faceId, profile || undefined, history);
+      setReport(data);
+    } catch (err: any) {
+      setReportError(err.message || 'Failed to generate report');
+    } finally {
+      setReportLoading(false);
+    }
+  }
 
   const timeline = buildTimeline(history, scans);
   const goodProducts = [...history, ...scans].filter(s => s.verdict?.toLowerCase() === 'good match').slice(0, 4);
@@ -92,57 +93,66 @@ export default function Reports() {
 
           {/* Top row — Executive Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Score gauge */}
-            <div className="bg-white rounded-2xl p-6 border border-border shadow-sm flex items-center gap-6">
-              {reportLoading ? (
-                <div className="w-28 h-28 shrink-0 rounded-full bg-gray-200 animate-pulse" />
-              ) : (
+            {/* Score gauge / Generate button */}
+            {report ? (
+              <div className="bg-white rounded-2xl p-6 border border-border shadow-sm flex items-center gap-6">
                 <div className="relative w-28 h-28 shrink-0">
                   <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="42" fill="none" stroke="#EAE6DF" strokeWidth="8" />
-                    <circle
-                      cx="50" cy="50" r="42" fill="none" stroke="#2C5E43" strokeWidth="8"
-                      strokeDasharray={`${((report?.skin_health_score ?? 65) / 100) * 264} 264`}
-                      strokeLinecap="round"
-                    />
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#2C5E43" strokeWidth="8"
+                      strokeDasharray={`${(report.skin_health_score / 100) * 264} 264`}
+                      strokeLinecap="round" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-bold text-deep">{report?.skin_health_score ?? '--'}</span>
+                    <span className="text-3xl font-bold text-deep">{report.skin_health_score}</span>
                     <span className="text-[10px] text-gray-mid uppercase tracking-wider">/ 100</span>
                   </div>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold text-deep mb-1">Skin Health Score</h3>
-                {report ? (
-                  <>
-                    <div className={`flex items-center gap-1 text-sm font-medium ${
-                      report.score_trend === 'improving' ? 'text-green-600' :
-                      report.score_trend === 'declining' ? 'text-red-500' :
-                      'text-yellow-600'
-                    }`}>
-                      {report.score_trend === 'improving' ? <TrendingUp size={16} /> :
-                       report.score_trend === 'declining' ? <TrendingDown size={16} /> :
-                       <Activity size={16} />}
-                      {report.score_trend === 'improving' ? 'Improving' :
-                       report.score_trend === 'declining' ? 'Declining' : 'Stable'}
-                    </div>
-                    <p className="text-[11px] text-gray-mid mt-2 leading-relaxed">
-                      {report.top_strength}
-                    </p>
-                  </>
-                ) : reportLoading ? (
-                  <div className="space-y-2">
-                    <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
-                    <div className="h-3 w-48 bg-gray-200 rounded animate-pulse" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-deep mb-1">Skin Health Score</h3>
+                  <div className={`flex items-center gap-1 text-sm font-medium ${
+                    report.score_trend === 'improving' ? 'text-green-600' :
+                    report.score_trend === 'declining' ? 'text-red-500' : 'text-yellow-600'
+                  }`}>
+                    {report.score_trend === 'improving' ? <TrendingUp size={16} /> :
+                     report.score_trend === 'declining' ? <TrendingDown size={16} /> :
+                     <Activity size={16} />}
+                    {report.score_trend === 'improving' ? 'Improving' :
+                     report.score_trend === 'declining' ? 'Declining' : 'Stable'}
                   </div>
-                ) : (
-                  <p className="text-xs text-gray-mid mt-2">
-                    Scan your skin and products to get an AI-powered health score.
-                  </p>
-                )}
+                  <p className="text-[11px] text-gray-mid mt-2 leading-relaxed">{report.top_strength}</p>
+                </div>
+                <button
+                  onClick={handleGenerate}
+                  disabled={reportLoading}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-forest bg-accent/40 rounded-lg hover:bg-accent transition-colors disabled:opacity-60"
+                >
+                  {reportLoading ? <Loader2 size={12} className="animate-spin" /> : <BarChart3 size={12} />}
+                  {reportLoading ? 'Generating...' : 'Regenerate'}
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="bg-white rounded-2xl p-8 border border-border shadow-sm flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-full bg-accent/40 flex items-center justify-center mb-4">
+                  <FileText size={28} className="text-forest" />
+                </div>
+                <h3 className="text-lg font-semibold text-deep mb-1">Generate Your Report</h3>
+                <p className="text-sm text-gray-mid mb-5 max-w-sm">
+                  Analyze your skin profile and scanned products to get an AI-powered clinical report with health score, strengths, and recommendations.
+                </p>
+                {reportError && (
+                  <p className="text-xs text-red-500 mb-3">{reportError}</p>
+                )}
+                <button
+                  onClick={handleGenerate}
+                  disabled={reportLoading}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-forest text-white rounded-xl font-medium hover:bg-forest/90 transition-colors disabled:opacity-60"
+                >
+                  {reportLoading ? <Loader2 size={16} className="animate-spin" /> : <BarChart3 size={16} />}
+                  {reportLoading ? 'Generating...' : 'Generate Report'}
+                </button>
+              </div>
+            )}
 
             {/* Scar & Blemish status */}
             <div className="bg-white rounded-2xl p-6 border border-border shadow-sm flex items-center gap-4">

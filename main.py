@@ -1027,32 +1027,38 @@ async def marketplace_search(face_id: str = Form(...), goal: str = Form("")):
 
 
 @app.post("/api/generate-report")
-async def generate_report(face_id: str = Form(...)):
-    """Run the Report Agent on a saved profile + scan history.
+async def generate_report(body: dict = Body(...)):
+    """Run the Report Agent on profile + scan history.
 
-    Produces a structured skin health score and clinical insights using
-    the LLM, based on actual scan data — not heuristics on the frontend.
-    Falls back to a rule-based score if the model call fails.
+    Accepts a JSON body with:
+      - face_id (str) — used to look up Supabase data if no profile sent
+      - profile (dict | null) — skin profile data (bypasses Supabase)
+      - history (list | null) — scan history items (bypasses Supabase)
+
+    Falls back to a rule-based score if the model call fails or is missing.
     """
-    face_id = face_id.strip().upper()
+    face_id = (body.get("face_id") or "").strip().upper()
+    profile = body.get("profile")
+    history = body.get("history") or []
 
-    # --- fetch profile + history -------------------------------------------
-    if supabase is None:
-        return error_json(503, "Report generation needs Supabase, which is not configured.")
-
-    try:
-        prof_res = (supabase.table("skin_profiles").select("*")
-                    .eq("face_id", face_id).limit(1).execute())
-        hist_res = (supabase.table("scan_history").select("*")
-                    .eq("face_id", face_id).order("scanned_at", desc=True).execute())
-    except Exception as exc:
-        return error_json(502, f"Database error ({exc}).")
-
-    if not prof_res.data:
-        return error_json(404, f"No skin profile found for face ID {face_id}.")
-
-    profile = prof_res.data[0]
-    history = hist_res.data or []
+    # If profile not sent inline, try Supabase lookup
+    if not profile:
+        if supabase is None:
+            return error_json(503, "Report generation needs Supabase when profile data is not sent inline.")
+        try:
+            prof_res = (supabase.table("skin_profiles").select("*")
+                        .eq("face_id", face_id).limit(1).execute())
+        except Exception as exc:
+            return error_json(502, f"Database error ({exc}).")
+        if not prof_res.data:
+            return error_json(404, f"No skin profile found for face ID {face_id}.")
+        profile = prof_res.data[0]
+        try:
+            hist_res = (supabase.table("scan_history").select("*")
+                        .eq("face_id", face_id).order("scanned_at", desc=True).execute())
+            history = hist_res.data or []
+        except Exception:
+            history = []
 
     # --- build the report input --------------------------------------------
     scar_regions = profile.get("scar_regions") or []

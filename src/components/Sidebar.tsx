@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { ScanLine, User, Store, BarChart3 } from 'lucide-react';
+import { ScanLine, User, Store, BarChart3, LogOut } from 'lucide-react';
+import { clearAuth } from '../api';
 import { useAppState } from '../AppContext';
 
 const navItems = [
@@ -38,10 +39,17 @@ export default function Sidebar({ active }: { active: string }) {
       </nav>
       <div className="flex items-center gap-3 pt-6 border-t border-border">
         <div className="w-10 h-10 rounded-full bg-forest text-white flex items-center justify-center text-sm font-semibold">{initial}</div>
-        <div>
+        <div className="flex-1">
           <p className="text-sm font-medium text-deep">{userName}</p>
           <p className="text-xs text-gray-mid">{userPlan}</p>
         </div>
+        <button
+          onClick={() => { clearAuth(); window.location.reload(); }}
+          className="p-2 rounded-lg text-gray-mid hover:text-red-600 hover:bg-red-50 transition-colors"
+          title="Log out"
+        >
+          <LogOut size={16} />
+        </button>
       </div>
     </aside>
   );

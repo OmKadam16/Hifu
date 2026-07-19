@@ -142,12 +142,15 @@ export async function getHistory(faceId: string): Promise<ScanHistoryItem[]> {
   return body.data;
 }
 
-export async function generateReport(faceId: string): Promise<ReportData> {
-  const fd = new FormData();
-  fd.append('face_id', faceId);
-  const res = await fetch(`${BASE}/api/generate-report`, { method: 'POST', body: fd });
-  const body = await handleResponse(res);
-  return body.data;
+export async function generateReport(faceId: string, profile?: SkinProfile, history?: ScanHistoryItem[]): Promise<ReportData> {
+  const body = { face_id: faceId, profile: profile || null, history: history || [] };
+  const res = await fetch(`${BASE}/api/generate-report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await handleResponse(res);
+  return data.data;
 }
 
 export async function marketplaceSearch(faceId: string, goal: string): Promise<MarketplaceProduct[]> {
