@@ -6,7 +6,7 @@ import { useAppState } from '../AppContext';
 
 export default function ScanProduct() {
   const navigate = useNavigate();
-  const { profile, addScan } = useAppState();
+  const { profile, addScan, addLog } = useAppState();
   const faceId = getFaceId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -22,6 +22,15 @@ export default function ScanProduct() {
     try {
       const result = await analyzeProduct(f, profile ?? undefined, faceId || undefined);
       addScan(result);
+      addLog({
+        id: `prod-${Date.now()}`,
+        type: 'product',
+        label: result.product_name,
+        detail: `Verdict: ${result.verdict} · ${result.summary}`,
+        timestamp: new Date().toISOString(),
+        verdict: result.verdict,
+        data: result,
+      });
       navigate('/result', { state: { scan: result } });
     } catch (e: any) {
       alert(e.message);

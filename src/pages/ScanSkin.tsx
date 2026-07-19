@@ -7,7 +7,7 @@ import LiveCameraScanner from '../components/LiveCameraScanner';
 
 export default function ScanSkin() {
   const navigate = useNavigate();
-  const { setProfile, setScanPhoto } = useAppState();
+  const { setProfile, setScanPhoto, addLog } = useAppState();
   const inputRef = useRef<HTMLInputElement>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -45,8 +45,16 @@ export default function ScanSkin() {
     setLoading(true);
     try {
       const existingId = getFaceId() || undefined;
-      const { data } = await assessSkin(f, goal, existingId);
+      const { face_id, data } = await assessSkin(f, goal, existingId);
       setProfile(data);
+      addLog({
+        id: `skin-${Date.now()}`,
+        type: 'skin',
+        label: 'Skin Assessment',
+        detail: `${data.skin_type} skin · ${(data.visible_conditions || []).join(', ') || 'no visible conditions'}`,
+        timestamp: new Date().toISOString(),
+        data,
+      });
       navigate('/profile');
     } catch (e: any) {
       setScanPhoto(null);

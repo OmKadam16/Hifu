@@ -1,26 +1,9 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, CheckCircle, AlertTriangle,
-  Clock, Activity, BarChart3, Sparkles, Loader2, FileText } from 'lucide-react';
+  Clock, Activity, BarChart3, Sparkles, Loader2, FileText, ScanLine } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useAppState } from '../AppContext';
-import { getFaceId, generateReport, type ReportData, type ScanHistoryItem, type ProductAnalysis } from '../api';
-
-interface LogEntry { date: string; label: string; type: 'positive' | 'negative' | 'neutral'; detail: string }
-
-function buildTimeline(history: ScanHistoryItem[], scans: ProductAnalysis[]): LogEntry[] {
-  const all = [...history, ...scans];
-  const entries: LogEntry[] = all.slice(0, 10).map(s => {
-    const v = s.verdict?.toLowerCase() || '';
-    const name = 'product_name' in s ? s.product_name : 'Skin Scan';
-    const t = 'scanned_at' in s ? s.scanned_at : new Date().toISOString();
-    if (v === 'good match') return { date: t, label: `Scanned ${name}`, type: 'positive' as const, detail: 'Good match — ingredients align with your profile.' };
-    if (v === 'not a good match') return { date: t, label: `Scanned ${name}`, type: 'negative' as const, detail: 'Not a good match — contains flagged irritants.' };
-    if (v === 'mixed') return { date: t, label: `Scanned ${name}`, type: 'neutral' as const, detail: 'Mixed — some ingredients help, others may irritate.' };
-    return { date: t, label: `Scanned ${name}`, type: 'neutral' as const, detail: 'Profile scan completed.' };
-  });
-  if (!entries.length) entries.push({ date: new Date().toISOString(), label: 'Base profile generated', type: 'neutral', detail: 'Initial assessment recorded.' });
-  return entries;
-}
+import { getFaceId, generateReport, type ReportData } from '../api';
 
 function timeAgo(d: string): string {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
@@ -32,7 +15,7 @@ function timeAgo(d: string): string {
 }
 
 export default function Reports() {
-  const { profile, scans, history } = useAppState();
+  const { profile, scanLog } = useAppState();
   const faceId = getFaceId();
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,8 +26,8 @@ export default function Reports() {
     setError('');
     setLoading(true);
     try {
-      const merged = [...history, ...scans];
-      const data = await generateReport(faceId, profile || undefined, merged);
+      const productScans = scanLog.filter(e => e.type === 'product' && e.data).map(e => e.data) as any[];
+      const data = await generateReport(faceId, profile || undefined, productScans);
       setReport(data);
     } catch (err: any) {
       setError(err.message || 'Failed to generate report');
@@ -52,8 +35,6 @@ export default function Reports() {
       setLoading(false);
     }
   }
-
-  const timeline = buildTimeline(history, scans);
 
   return (
     <div className="flex min-h-screen bg-cream">
@@ -154,25 +135,29 @@ export default function Reports() {
               <h3 className="text-base font-semibold text-deep">Timeline</h3>
             </div>
             <div className="space-y-0">
-              {timeline.map((entry, i) => (
-                <div key={i} className="flex gap-4 pb-4 relative">
-                  {i < timeline.length - 1 && <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />}
+              {scanLog.length > 0 ? scanLog.slice(0, 15).map((entry) => (
+                <div key={entry.id} className="flex gap-4 pb-4 relative last:pb-0">
                   <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-                    entry.type === 'positive' ? 'bg-green-100' : entry.type === 'negative' ? 'bg-red-100' : 'bg-gray-100'
+                    entry.type === 'skin' ? 'bg-blue-100' :
+                    entry.verdict?.toLowerCase() === 'good match' ? 'bg-green-100' :
+                    entry.verdict?.toLowerCase() === 'not a good match' ? 'bg-red-100' : 'bg-gray-100'
                   }`}>
-                    {entry.type === 'positive' ? <CheckCircle size={12} className="text-green-600" /> :
-                     entry.type === 'negative' ? <AlertTriangle size={12} className="text-red-500" /> :
+                    {entry.type === 'skin' ? <ScanLine size={12} className="text-blue-600" /> :
+                     entry.verdict?.toLowerCase() === 'good match' ? <CheckCircle size={12} className="text-green-600" /> :
+                     entry.verdict?.toLowerCase() === 'not a good match' ? <AlertTriangle size={12} className="text-red-500" /> :
                      <div className="w-2 h-2 rounded-full bg-gray-mid" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-deep">{entry.label}</p>
-                      <span className="text-[10px] text-gray-mid shrink-0 ml-2">{timeAgo(entry.date)}</span>
+                      <span className="text-[10px] text-gray-mid shrink-0 ml-2">{timeAgo(entry.timestamp)}</span>
                     </div>
                     <p className="text-[11px] text-gray-mid mt-0.5">{entry.detail}</p>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm text-gray-mid">No activity yet. Scan your skin or products to build your timeline.</p>
+              )}
             </div>
           </div>
         </div>

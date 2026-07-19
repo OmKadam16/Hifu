@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, AlertTriangle, WifiOff } from 'lucide-react';
+import { RefreshCw, AlertTriangle, WifiOff, ScanLine } from 'lucide-react';
 import { useAppState } from '../AppContext';
 import Sidebar from '../components/Sidebar';
 
@@ -10,19 +10,18 @@ function greeting(): string {
   return 'Good evening';
 }
 
-function verdictColor(v: string): string {
-  switch (v?.toLowerCase()) {
-    case 'good match': return 'bg-green-100 text-green-800';
-    case 'not a good match': return 'bg-red-100 text-red-800';
-    case 'mixed': return 'bg-amber-100 text-amber-800';
-    default: return 'bg-gray-100 text-gray-600';
-  }
+function timeAgo(d: string): string {
+  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
+  if (m < 1) return 'Just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile, scans, history, health, checkHealth, loading, userName } = useAppState();
-  const recent = [...history, ...scans].slice(0, 5);
+  const { profile, scanLog, health, checkHealth, loading, userName } = useAppState();
 
   return (
     <div className="flex min-h-screen bg-cream">
@@ -88,40 +87,44 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* Recent scans */}
+          {/* Scan log */}
           {loading ? (
             <div className="space-y-3">
               <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
-              <div className="flex gap-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="min-w-[260px] h-36 bg-gray-200 rounded-2xl animate-pulse" />
-                ))}
-              </div>
+              {[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-200 rounded-xl animate-pulse" />)}
             </div>
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-deep">Recent Scans</h3>
-                <button className="text-sm text-forest font-medium hover:underline">VIEW ALL</button>
+                <h3 className="text-lg font-semibold text-deep">Activity Log</h3>
+                <span className="text-xs text-gray-mid">{scanLog.length} scan{scanLog.length !== 1 ? 's' : ''}</span>
               </div>
 
-              <div className="flex gap-4 overflow-x-auto pb-2 mb-10">
-                {recent.length > 0 ? recent.map((item, i) => (
+              <div className="space-y-2 mb-10">
+                {scanLog.length > 0 ? scanLog.map((entry) => (
                   <div
-                    key={i}
-                    className="min-w-[260px] w-[260px] bg-white rounded-2xl border border-border overflow-hidden flex-shrink-0 cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => navigate('/result', { state: { scan: item } })}
+                    key={entry.id}
+                    className="bg-white rounded-xl border border-border px-4 py-3 flex items-center gap-3 cursor-pointer hover:shadow-sm transition-shadow"
+                    onClick={() => {
+                      if (entry.type === 'product' && entry.data) navigate('/result', { state: { scan: entry.data } });
+                      if (entry.type === 'skin') navigate('/profile');
+                    }}
                   >
-                    <div className="h-20 bg-gradient-to-br from-forest/10 to-accent/30 flex items-center justify-center text-3xl">🧴</div>
-                    <div className="p-4">
-                      <p className="text-xs text-gray-mid">{'product_name' in item ? item.product_name : 'Skin Scan'}</p>
-                      <p className="text-sm font-medium text-deep truncate">{'product_name' in item ? item.product_name : 'Skin Analysis'}</p>
-                      {'verdict' in item && (
-                        <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${verdictColor(item.verdict)}`}>
-                          {item.verdict}
-                        </span>
-                      )}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                      entry.type === 'skin' ? 'bg-blue-100' :
+                      entry.verdict?.toLowerCase() === 'good match' ? 'bg-green-100' :
+                      entry.verdict?.toLowerCase() === 'not a good match' ? 'bg-red-100' : 'bg-gray-100'
+                    }`}>
+                      {entry.type === 'skin' ? <ScanLine size={14} className="text-blue-600" /> :
+                       entry.verdict?.toLowerCase() === 'good match' ? <span className="text-green-600 text-xs">✓</span> :
+                       entry.verdict?.toLowerCase() === 'not a good match' ? <span className="text-red-500 text-xs">✗</span> :
+                       <span className="text-gray-500 text-xs">•</span>}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-deep truncate">{entry.label}</p>
+                      <p className="text-xs text-gray-mid truncate">{entry.detail}</p>
+                    </div>
+                    <span className="text-xs text-gray-mid shrink-0">{timeAgo(entry.timestamp)}</span>
                   </div>
                 )) : (
                   <p className="text-gray-mid text-sm">No scans yet. Scan your skin or a product above.</p>
