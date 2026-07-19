@@ -78,6 +78,7 @@ export function clearAuth() {
   localStorage.removeItem('hifu_session_token');
   localStorage.removeItem('hifu_face_id');
   localStorage.removeItem('hifu_user_name');
+  localStorage.removeItem('hifu_scan_photo');
 }
 
 export { getFaceId, setFaceId };

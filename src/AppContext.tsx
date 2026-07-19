@@ -34,6 +34,7 @@ interface AppState {
 const AppContext = createContext<AppState | null>(null);
 
 const LOG_KEY = 'hifu_scan_log';
+const PHOTO_KEY = 'hifu_scan_photo';
 
 function loadLog(): LogEntry[] {
   try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch { return []; }
@@ -41,6 +42,17 @@ function loadLog(): LogEntry[] {
 
 function saveLog(log: LogEntry[]) {
   try { localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(0, 50))); } catch { /* quota */ }
+}
+
+function loadPhoto(): string | null {
+  try { return localStorage.getItem(PHOTO_KEY); } catch { return null; }
+}
+
+function savePhoto(url: string | null) {
+  try {
+    if (url) localStorage.setItem(PHOTO_KEY, url);
+    else localStorage.removeItem(PHOTO_KEY);
+  } catch { /* quota */ }
 }
 
 interface AppProviderProps {
@@ -56,7 +68,7 @@ export function AppProvider({ children, faceId, userName }: AppProviderProps) {
   const [scanLog, setScanLog] = useState<LogEntry[]>(loadLog);
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [scanPhoto, setScanPhotoState] = useState<string | null>(null);
+  const [scanPhoto, setScanPhotoState] = useState<string | null>(loadPhoto);
 
   const checkHealth = useCallback(async () => {
     setHealth(await healthCheck());
@@ -81,6 +93,7 @@ export function AppProvider({ children, faceId, userName }: AppProviderProps) {
   }, []);
 
   const setScanPhoto = useCallback((url: string | null) => {
+    savePhoto(url);
     setScanPhotoState(url);
   }, []);
 
